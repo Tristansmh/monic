@@ -3,28 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy Music Player</title>
-    <meta name="referrer" content="no-referrer-when-downgrade">
+    <title>Privacy Music Player - Fixed</title>
+    <meta name="referrer" content="strict-origin-when-cross-origin">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .container { max-width: 800px; width: 100%; }
         .search-box { display: flex; gap: 10px; margin-bottom: 20px; }
         input[type="text"] { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #333; background: #222; color: white; outline: none; padding-left: 20px; }
-        .btn { background: #1db954; border: none; color: white; padding: 10px 20px; border-radius: 25px; cursor: pointer; font-weight: bold; transition: 0.2s; }
-        .btn:hover { background: #1ed760; }
-        .btn-shuffle { background: #535353; font-size: 12px; margin-left: 10px; }
+        .btn { background: #1db954; border: none; color: white; padding: 10px 20px; border-radius: 25px; cursor: pointer; font-weight: bold; }
         #player-wrapper { width: 100%; display: none; margin-bottom: 30px; }
         .iframe-container { width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
         iframe { width: 100%; height: 100%; border: none; }
         h3 { border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 30px; color: #1db954; display: flex; justify-content: space-between; align-items: center; }
         .results, .playlist { display: grid; grid-template-columns: 1fr; gap: 10px; }
         .video-item { display: flex; align-items: center; gap: 15px; background: #1e1e1e; padding: 10px; border-radius: 8px; cursor: pointer; }
-        .video-item:hover { background: #282828; }
         .video-item img { width: 80px; height: 45px; object-fit: cover; border-radius: 4px; }
         .video-info { flex: 1; }
-        .video-info h4 { margin: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 350px; }
+        .video-info h4 { margin: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px; }
         .video-info p { margin: 0; font-size: 12px; color: #b3b3b3; }
-        .remove-btn { color: #ff4444; background: none; border: none; cursor: pointer; font-size: 20px; }
         .status { font-size: 11px; color: #777; margin-bottom: 10px; }
     </style>
 </head>
@@ -35,54 +31,53 @@
         <input type="text" id="query" placeholder="Search for music...">
         <button class="btn" onclick="startSearch()">Search</button>
     </div>
-    <div id="status" class="status"></div>
+    <div id="status" class="status">Ready.</div>
 
     <div id="player-wrapper">
         <div class="iframe-container">
-            <iframe id="main-player" src="" allow="autoplay; encrypted-media" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>
+            <iframe id="main-player" 
+                    src="" 
+                    allow="autoplay; encrypted-media" 
+                    allowfullscreen 
+                    referrerpolicy="strict-origin-when-cross-origin"></iframe>
         </div>
     </div>
 
-    <h3>Search Results</h3>
+    <h3>Results</h3>
     <div id="results-list" class="results"></div>
 
-    <h3>
-        My Playlist 
-        <button class="btn btn-shuffle" onclick="shufflePlaylist()">Shuffle & Play</button>
-    </h3>
+    <h3>Playlist <button class="btn" style="font-size:10px; background:#444;" onclick="shufflePlaylist()">Shuffle</button></h3>
     <div id="playlist-list" class="playlist"></div>
 </div>
 
 <script>
-    // Re-added the automatic fallback server list
+    // Updated list with the most stable Feb 2026 servers first
     const instances = [
-        'https://inv.nadeko.net',
         'https://yewtu.be',
+        'https://inv.nadeko.net',
         'https://invidious.nerdvpn.de',
         'https://inv.tux.pizza'
     ];
-    let currentInstanceIdx = 0;
+    let currentIdx = 0;
     let myPlaylist = JSON.parse(localStorage.getItem('myPrivacyPlaylist')) || [];
 
     window.onload = renderPlaylist;
 
     async function startSearch() {
-        currentInstanceIdx = 0;
-        performFetch();
+        const q = document.getElementById('query').value;
+        if (!q) return;
+        currentIdx = 0;
+        document.getElementById('results-list').innerHTML = "Searching...";
+        performFetch(q);
     }
 
-    async function performFetch() {
-        const q = document.getElementById('query').value;
-        const list = document.getElementById('results-list');
+    async function performFetch(q) {
         const status = document.getElementById('status');
-        if (!q) return;
-
-        const activeUrl = instances[currentInstanceIdx];
-        status.innerText = `Connecting to: ${new URL(activeUrl).hostname}...`;
-        list.innerHTML = "<p>Searching...</p>";
+        const list = document.getElementById('results-list');
         
         try {
-            const response = await fetch(`${activeUrl}/api/v1/search?q=${encodeURIComponent(q)}`);
+            status.innerText = `Trying ${new URL(instances[currentIdx]).hostname}...`;
+            const response = await fetch(`${instances[currentIdx]}/api/v1/search?q=${encodeURIComponent(q)}`);
             if (!response.ok) throw new Error();
             const data = await response.json();
             
@@ -96,17 +91,17 @@
                         <h4>${v.title}</h4>
                         <p>${v.author}</p>
                     </div>
-                    <button class="btn" style="font-size:11px; padding:5px 10px;" onclick="addToPlaylist('${v.videoId}', '${v.title.replace(/'/g, "")}', '${v.author.replace(/'/g, "")}', '${v.videoThumbnails[0].url}')">Save</button>
+                    <button class="btn" style="font-size:10px;" onclick="addToPlaylist('${v.videoId}', '${v.title.replace(/'/g, "")}', '${v.author.replace(/'/g, "")}', '${v.videoThumbnails[0].url}')">Save</button>
                 `;
                 list.appendChild(item);
             });
             status.innerText = "Connected.";
         } catch (err) {
-            currentInstanceIdx++;
-            if (currentInstanceIdx < instances.length) {
-                performFetch();
+            currentIdx++;
+            if (currentIdx < instances.length) {
+                performFetch(q);
             } else {
-                status.innerText = "All servers are currently busy. Try again later.";
+                status.innerText = "All privacy servers are busy. Please try again in a minute.";
                 list.innerHTML = "";
             }
         }
@@ -114,53 +109,46 @@
 
     function playVideo(id) {
         const player = document.getElementById('main-player');
-        const wrapper = document.getElementById('player-wrapper');
-        player.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`;
-        wrapper.style.display = 'block';
+        document.getElementById('player-wrapper').style.display = 'block';
+        // The no-cookie domain + rel=0 is the most stable embed format right now
+        player.src = `https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0&modestbranding=1`;
         window.scrollTo({top:0, behavior:'smooth'});
     }
 
     function addToPlaylist(id, title, author, thumb) {
-        if (!myPlaylist.some(item => item.id === id)) {
+        if (!myPlaylist.some(i => i.id === id)) {
             myPlaylist.push({ id, title, author, thumb });
             localStorage.setItem('myPrivacyPlaylist', JSON.stringify(myPlaylist));
             renderPlaylist();
         }
     }
 
-    function removeFromPlaylist(id) {
-        myPlaylist = myPlaylist.filter(item => item.id !== id);
-        localStorage.setItem('myPrivacyPlaylist', JSON.stringify(myPlaylist));
-        renderPlaylist();
-    }
-
-    function shufflePlaylist() {
-        if (myPlaylist.length === 0) return;
-        const randomSong = myPlaylist[Math.floor(Math.random() * myPlaylist.length)];
-        playVideo(randomSong.id);
-    }
-
     function renderPlaylist() {
         const list = document.getElementById('playlist-list');
-        list.innerHTML = myPlaylist.length ? "" : "<p style='color:#666'>Your playlist is empty.</p>";
+        list.innerHTML = myPlaylist.length ? "" : "<p style='color:#666'>Empty.</p>";
         myPlaylist.forEach(v => {
             const item = document.createElement('div');
             item.className = 'video-item';
             item.innerHTML = `
                 <img src="${v.thumb}" onclick="playVideo('${v.id}')">
-                <div class="video-info" onclick="playVideo('${v.id}')">
-                    <h4>${v.title}</h4>
-                    <p>${v.author}</p>
-                </div>
-                <button class="remove-btn" onclick="removeFromPlaylist('${v.id}')">×</button>
+                <div class="video-info" onclick="playVideo('${v.id}')"><h4>${v.title}</h4><p>${v.author}</p></div>
+                <button style="background:none; border:none; color:red; cursor:pointer;" onclick="removeFromPlaylist('${v.id}')">×</button>
             `;
             list.appendChild(item);
         });
     }
 
-    document.getElementById('query').addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') startSearch();
-    });
+    function removeFromPlaylist(id) {
+        myPlaylist = myPlaylist.filter(i => i.id !== id);
+        localStorage.setItem('myPrivacyPlaylist', JSON.stringify(myPlaylist));
+        renderPlaylist();
+    }
+
+    function shufflePlaylist() {
+        if (myPlaylist.length) playVideo(myPlaylist[Math.floor(Math.random() * myPlaylist.length)].id);
+    }
+
+    document.getElementById('query').addEventListener('keypress', (e) => { if (e.key === 'Enter') startSearch(); });
 </script>
 </body>
 </html>
