@@ -3,40 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Privacy Music + Playlists</title>
+    <title>Privacy Music Player</title>
     <meta name="referrer" content="no-referrer-when-downgrade">
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #121212; color: white; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .container { max-width: 800px; width: 100%; }
-        .search-box { display: flex; gap: 10px; margin-bottom: 20px; }
-        input[type="text"] { flex: 1; padding: 12px; border-radius: 25px; border: 1px solid #333; background: #222; color: white; outline: none; padding-left: 20px; }
+        
+        .top-bar { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        .search-box { display: flex; gap: 10px; }
+        input[type="text"], select { padding: 12px; border-radius: 25px; border: 1px solid #333; background: #222; color: white; outline: none; }
+        input[type="text"] { flex: 1; padding-left: 20px; }
+        
         .btn { background: #1db954; border: none; color: white; padding: 10px 20px; border-radius: 25px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .btn:hover { background: #1ed760; }
-        
+        .btn-shuffle { background: #535353; font-size: 12px; margin-left: 10px; }
+
         #player-wrapper { width: 100%; display: none; margin-bottom: 30px; }
         .iframe-container { width: 100%; aspect-ratio: 16/9; border-radius: 12px; overflow: hidden; background: #000; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
         iframe { width: 100%; height: 100%; border: none; }
 
-        h3 { border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 30px; color: #1db954; }
+        h3 { border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 30px; color: #1db954; display: flex; justify-content: space-between; align-items: center; }
         .results, .playlist { display: grid; grid-template-columns: 1fr; gap: 10px; }
-        .video-item { display: flex; align-items: center; gap: 15px; background: #1e1e1e; padding: 10px; border-radius: 8px; cursor: pointer; position: relative; }
+        .video-item { display: flex; align-items: center; gap: 15px; background: #1e1e1e; padding: 10px; border-radius: 8px; cursor: pointer; }
         .video-item:hover { background: #282828; }
         .video-item img { width: 80px; height: 45px; object-fit: cover; border-radius: 4px; }
         .video-info { flex: 1; }
-        .video-info h4 { margin: 0; font-size: 14px; }
+        .video-info h4 { margin: 0; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 400px; }
         .video-info p { margin: 0; font-size: 12px; color: #b3b3b3; }
         
-        .add-btn { background: #333; color: white; border: none; padding: 5px 10px; border-radius: 15px; font-size: 11px; cursor: pointer; }
-        .add-btn:hover { background: #1db954; }
-        .remove-btn { color: #ff4444; background: none; border: none; cursor: pointer; font-size: 18px; }
+        .action-btns { display: flex; gap: 10px; }
+        .remove-btn { color: #ff4444; background: none; border: none; cursor: pointer; font-size: 20px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="search-box">
-        <input type="text" id="query" placeholder="Search for music...">
-        <button class="btn" onclick="startSearch()">Search</button>
+    <div class="top-bar">
+        <div class="search-box">
+            <input type="text" id="query" placeholder="Search for music...">
+            <button class="btn" onclick="startSearch()">Search</button>
+        </div>
+        <select id="instance-select">
+            <option value="https://inv.nadeko.net">Server: Chile (Nadeko)</option>
+            <option value="https://yewtu.be">Server: Germany (Yewtu.be)</option>
+            <option value="https://invidious.nerdvpn.de">Server: Ukraine (NerdVPN)</option>
+            <option value="https://inv.tux.pizza">Server: Tux Pizza</option>
+        </select>
     </div>
 
     <div id="player-wrapper">
@@ -45,27 +57,31 @@
         </div>
     </div>
 
-    <h3>Search Results</h3>
-    <div id="results-list" class="results"></div>
+    <div id="results-area">
+        <h3>Search Results</h3>
+        <div id="results-list" class="results"></div>
+    </div>
 
-    <h3>My Playlist</h3>
+    <h3>
+        My Playlist 
+        <button class="btn btn-shuffle" onclick="shufflePlaylist()">Shuffle & Play</button>
+    </h3>
     <div id="playlist-list" class="playlist"></div>
 </div>
 
 <script>
     let myPlaylist = JSON.parse(localStorage.getItem('myPrivacyPlaylist')) || [];
-
-    // Load Playlist on startup
     window.onload = renderPlaylist;
 
     async function startSearch() {
         const q = document.getElementById('query').value;
+        const instance = document.getElementById('instance-select').value;
         const list = document.getElementById('results-list');
         if (!q) return;
-        list.innerHTML = "Searching...";
+        list.innerHTML = "<p>Searching...</p>";
         
         try {
-            const response = await fetch(`https://inv.tux.pizza/api/v1/search?q=${encodeURIComponent(q)}`);
+            const response = await fetch(`${instance}/api/v1/search?q=${encodeURIComponent(q)}`);
             const data = await response.json();
             
             list.innerHTML = "";
@@ -78,12 +94,12 @@
                         <h4>${v.title}</h4>
                         <p>${v.author}</p>
                     </div>
-                    <button class="add-btn" onclick="addToPlaylist('${v.videoId}', '${v.title.replace(/'/g, "")}', '${v.author.replace(/'/g, "")}', '${v.videoThumbnails[0].url}')">+ Add</button>
+                    <button class="btn" style="font-size:11px; padding:5px 10px;" onclick="addToPlaylist('${v.videoId}', '${v.title.replace(/'/g, "")}', '${v.author.replace(/'/g, "")}', '${v.videoThumbnails[0].url}')">Save</button>
                 `;
                 list.appendChild(item);
             });
         } catch (err) {
-            list.innerHTML = "Server busy. Try again.";
+            list.innerHTML = "<p>Server error. Try switching the server in the dropdown menu.</p>";
         }
     }
 
@@ -109,10 +125,15 @@
         renderPlaylist();
     }
 
+    function shufflePlaylist() {
+        if (myPlaylist.length === 0) return;
+        const randomSong = myPlaylist[Math.floor(Math.random() * myPlaylist.length)];
+        playVideo(randomSong.id);
+    }
+
     function renderPlaylist() {
         const list = document.getElementById('playlist-list');
-        list.innerHTML = myPlaylist.length ? "" : "<p style='color:#666'>No songs saved yet.</p>";
-        
+        list.innerHTML = myPlaylist.length ? "" : "<p style='color:#666'>Your playlist is empty.</p>";
         myPlaylist.forEach(v => {
             const item = document.createElement('div');
             item.className = 'video-item';
